@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const { name, experience, sector, lang = 'Español' } = req.body;
   if (!name || !experience) return res.status(400).json({ error: 'Nombre y trayectoria son obligatorios' });
 
-  const system = `Eres un experto en traducir trayectorias profesionales al lenguaje del mercado laboral actual, especialmente para personas con carreras no lineales o mayores de 50 años.
+  const prompt = `Eres un experto en traducir trayectorias profesionales al lenguaje del mercado laboral actual, especialmente para personas con carreras no lineales o mayores de 50 años.
 
 Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin backticks. Estructura exacta:
 {
@@ -23,23 +23,24 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin backticks. Estru
 }
 
 Idioma: ${lang}${sector ? `\nSector de interés: ${sector}` : ''}
-Sé honesto y específico. Sin jerga vacía. Mínimo 6 filas en translations.`;
+Sé honesto y específico. Sin jerga vacía. Mínimo 6 filas en translations.
+
+Trayectoria de ${name}:
+
+${experience}`;
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system,
-        messages: [{ role: 'user', content: `Trayectoria de ${name}:\n\n${experience}` }]
-      })
-    });
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+        })
+      }
+    );
 
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
@@ -47,7 +48,7 @@ Sé honesto y específico. Sin jerga vacía. Mínimo 6 filas en translations.`;
     }
 
     const data = await r.json();
-    const raw = data.content.map(b => b.text || '').join('');
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
     res.json(parsed);
 
