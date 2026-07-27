@@ -10,23 +10,28 @@ export default async function handler(req, res) {
 
   const prompt = `Eres un experto en traducir trayectorias profesionales al lenguaje del mercado laboral actual, especialmente para personas con carreras no lineales o mayores de 50 años.
 
-Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin backticks. Estructura exacta:
+Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después. Sin backticks. Sin markdown. Solo el JSON puro.
+
+Estructura exacta:
 {
-  "title": "titular profesional de una línea, estilo LinkedIn, que refleje su valor real en el mercado actual",
-  "summary": "perfil en primera persona, 3-4 frases, concreto, sin clichés. Que suene a una persona real.",
-  "capabilities": ["capacidad concreta 1", "capacidad concreta 2", "capacidad concreta 3", "capacidad concreta 4"],
-  "keywords": ["mínimo 10 palabras clave para LinkedIn y portales de empleo"],
+  "title": "titular profesional de una línea, estilo LinkedIn",
+  "summary": "perfil en primera persona, 3-4 frases, concreto, sin clichés",
+  "capabilities": ["capacidad 1", "capacidad 2", "capacidad 3", "capacidad 4"],
+  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8", "keyword9", "keyword10"],
   "translations": [
-    {"raw": "como lo dice el candidato", "modern": "término actual de mercado"}
+    {"raw": "expresión del candidato", "modern": "término de mercado actual"},
+    {"raw": "expresión 2", "modern": "término 2"},
+    {"raw": "expresión 3", "modern": "término 3"},
+    {"raw": "expresión 4", "modern": "término 4"},
+    {"raw": "expresión 5", "modern": "término 5"},
+    {"raw": "expresión 6", "modern": "término 6"}
   ],
-  "growth": ["sugerencia muy concreta 1 con recurso gratuito si aplica", "sugerencia 2", "sugerencia 3"]
+  "growth": ["sugerencia concreta 1 con recurso gratuito", "sugerencia 2", "sugerencia 3"]
 }
 
-Idioma: ${lang}${sector ? `\nSector de interés: ${sector}` : ''}
-Sé honesto y específico. Sin jerga vacía. Mínimo 6 filas en translations.
+Idioma de respuesta: ${lang}${sector ? `\nSector de interés: ${sector}` : ''}
 
 Trayectoria de ${name}:
-
 ${experience}`;
 
   try {
@@ -37,7 +42,11 @@ ${experience}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1200,
+            responseMimeType: 'application/json'
+          }
         })
       }
     );
@@ -49,7 +58,11 @@ ${experience}`;
 
     const data = await r.json();
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+
+    // Robust JSON extraction: find the outermost { ... }
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No se encontró JSON válido en la respuesta');
+    const parsed = JSON.parse(match[0]);
     res.json(parsed);
 
   } catch (e) {
