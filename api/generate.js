@@ -8,31 +8,29 @@ export default async function handler(req, res) {
   const { name, experience, sector, lang = 'Español' } = req.body;
   if (!name || !experience) return res.status(400).json({ error: 'Nombre y trayectoria son obligatorios' });
 
-  const prompt = `Eres un experto en traducir trayectorias profesionales al lenguaje del mercado laboral actual, especialmente para personas con carreras no lineales o mayores de 50 años.
+  const prompt = `Eres un experto en traducir trayectorias profesionales al lenguaje del mercado laboral actual.
 
-Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después. Sin backticks. Sin markdown. Solo el JSON puro.
+IMPORTANTE: Responde SOLO con JSON. Nada más. Ni una palabra antes ni después del JSON.
 
-Estructura exacta:
 {
-  "title": "titular profesional de una línea, estilo LinkedIn",
-  "summary": "perfil en primera persona, 3-4 frases, concreto, sin clichés",
+  "title": "titular profesional una línea",
+  "summary": "perfil 3-4 frases primera persona",
   "capabilities": ["capacidad 1", "capacidad 2", "capacidad 3", "capacidad 4"],
-  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8", "keyword9", "keyword10"],
+  "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5", "kw6", "kw7", "kw8", "kw9", "kw10"],
   "translations": [
-    {"raw": "expresión del candidato", "modern": "término de mercado actual"},
+    {"raw": "expresión candidato", "modern": "término mercado"},
     {"raw": "expresión 2", "modern": "término 2"},
     {"raw": "expresión 3", "modern": "término 3"},
     {"raw": "expresión 4", "modern": "término 4"},
     {"raw": "expresión 5", "modern": "término 5"},
     {"raw": "expresión 6", "modern": "término 6"}
   ],
-  "growth": ["sugerencia concreta 1 con recurso gratuito", "sugerencia 2", "sugerencia 3"]
+  "growth": ["sugerencia 1", "sugerencia 2", "sugerencia 3"]
 }
 
-Idioma de respuesta: ${lang}${sector ? `\nSector de interés: ${sector}` : ''}
-
-Trayectoria de ${name}:
-${experience}`;
+Idioma: ${lang}${sector ? `\nSector: ${sector}` : ''}
+Nombre: ${name}
+Trayectoria: ${experience}`;
 
   try {
     const r = await fetch(
@@ -42,26 +40,29 @@ ${experience}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1200,
-            responseMimeType: 'application/json'
-          }
+          generationConfig: { temperature: 0.4, maxOutputTokens: 1500 }
         })
       }
     );
 
+    const data = await r.json();
+
     if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e?.error?.message || `Error API ${r.status}`);
+      throw new Error(data?.error?.message || `Error API ${r.status}`);
     }
 
-    const data = await r.json();
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Robust JSON extraction: find the outermost { ... }
+    // Try to extract JSON object from response
     const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No se encontró JSON válido en la respuesta');
+    if (!match) {
+      // Return raw for debugging
+      return res.status(500).json({
+        error: 'Respuesta inesperada de Gemini',
+        debug: raw.slice(0, 300)
+      });
+    }
+
     const parsed = JSON.parse(match[0]);
     res.json(parsed);
 
