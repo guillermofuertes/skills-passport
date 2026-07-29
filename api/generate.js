@@ -81,7 +81,7 @@ Trayectoria: ${experience}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 1500 }
+          generationConfig: { temperature: 0.4, maxOutputTokens: 2500 }
         })
       }
     );
@@ -90,11 +90,12 @@ Trayectoria: ${experience}`;
     if (!r.ok) throw new Error(data?.error?.message || `Error API ${r.status}`);
 
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return res.status(500).json({ error: 'Respuesta inesperada de la IA', debug: raw.slice(0, 200) });
+    // Find outermost JSON object: from first { to last }
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start === -1 || end === -1) return res.status(500).json({ error: 'Respuesta inesperada de la IA', debug: raw.slice(0, 200) });
 
-    const parsed = JSON.parse(match[0]);
-    parsed._debug = raw.slice(0, 300);
+    const parsed = JSON.parse(raw.slice(start, end + 1));
     res.json(parsed);
 
   } catch (e) {
